@@ -3,7 +3,7 @@
 
 import os
 
-from ConfigParser import SafeConfigParser, NoSectionError
+from configparser import SafeConfigParser, NoSectionError
 from inspect import isclass
 from itertools import chain
 from types import BuiltinFunctionType
@@ -19,7 +19,7 @@ __all__ = 'ConfigFile', 'ConfigSection', 'ConfigSetting', 'SaveState', 'AtomicUp
 
 class ConfigFile(object):
     """Provide access to a configuration file"""
-    
+
     instances = {}
 
     def __new__(cls, filename):
@@ -58,9 +58,10 @@ class ConfigFile(object):
                 else:
                     return type(value)
             except Exception as e:
-                log.warning('ignoring invalid config value: %s.%s=%s (%s).' % (section, setting, value, e))
+                log.warning('ignoring invalid config value: %s.%s=%s (%s).' % (
+                    section, setting, value, e))
                 return default
-    
+
     def get_section(self, section, filter=None, default=None):
         """
         Return a list of (name, value) pairs from a section. If filter is an
@@ -71,7 +72,8 @@ class ConfigFile(object):
             if filter is None:
                 items = self.parser.items(section)
             else:
-                items = [(name, value) for name, value in self.parser.items(section) if name in filter]
+                items = [(name, value) for name, value in self.parser.items(
+                    section) if name in filter]
         except NoSectionError:
             return default
         else:
@@ -106,7 +108,7 @@ class SaveState(object):
         return self.__state__[item]
 
     def __iter__(self):
-        return self.__state__.iteritems()
+        return iter(self.__state__.items())
 
     def __len__(self):
         return len(self.__state__)
@@ -143,10 +145,11 @@ class ConfigSectionType(type):
     def __new__(mcls, name, bases, dictionary):
         settings = {}
         # copy all settings defined by parents unless also defined in the class being constructed
-        for name, setting in chain(*(cls.__settings__.iteritems() for cls in bases if isinstance(cls, ConfigSectionType))):
+        for name, setting in chain(*(iter(cls.__settings__.items()) for cls in bases if isinstance(cls, ConfigSectionType))):
             if name not in dictionary and name not in settings:
-                settings[name] = ConfigSetting(type=setting.type, value=setting.value)
-        for attr, value in dictionary.iteritems():
+                settings[name] = ConfigSetting(
+                    type=setting.type, value=setting.value)
+        for attr, value in dictionary.items():
             if isinstance(value, ConfigSetting):
                 settings[attr] = value
             elif attr.startswith('__') or isdescriptor(value) or type(value) is BuiltinFunctionType:
@@ -159,7 +162,8 @@ class ConfigSectionType(type):
                 settings[attr] = ConfigSetting(type=data_type, value=value)
         dictionary.update(settings)
 
-        cls = super(ConfigSectionType, mcls).__new__(mcls, name, bases, dictionary)
+        cls = super(ConfigSectionType, mcls).__new__(
+            mcls, name, bases, dictionary)
         cls.__settings__ = settings
         cls.__defaults__ = SaveState(cls)
 
@@ -174,17 +178,19 @@ class ConfigSectionType(type):
         return '%s:\n%s' % (cls.__name__, '\n'.join('  %s = %r' % (name, value) for name, value in cls) or '  pass')
 
     def __iter__(cls):
-        return ((name, descriptor.__get__(cls, cls.__class__)) for name, descriptor in cls.__settings__.iteritems())
+        return ((name, descriptor.__get__(cls, cls.__class__)) for name, descriptor in cls.__settings__.items())
 
     def __setattr__(cls, name, value):
-        if name == '__settings__' or name not in cls.__settings__:  # need to check for __settings__ as it is set first and the second part of the test depends on it being available
+        # need to check for __settings__ as it is set first and the second part of the test depends on it being available
+        if name == '__settings__' or name not in cls.__settings__:
             super(ConfigSectionType, cls).__setattr__(name, value)
         else:
             cls.__settings__[name].__set__(cls, value)
 
     def __delattr__(cls, name):
         if name == '__settings__' or name in cls.__settings__:
-            raise AttributeError('%r attribute %r cannot be deleted' % (cls.__name__, name))
+            raise AttributeError(
+                '%r attribute %r cannot be deleted' % (cls.__name__, name))
         else:
             super(ConfigSectionType, cls).__delattr__(name)
 
@@ -193,12 +199,13 @@ class ConfigSectionType(type):
         cfgfile = cfgfile or cls.__cfgfile__
         section = section or cls.__section__
         if None in (cfgfile, section):
-            raise ValueError('A config file and section are required for reading settings')
+            raise ValueError(
+                'A config file and section are required for reading settings')
         if isinstance(cfgfile, ConfigFile):
             config_file = cfgfile
         else:
             config_file = cls.__cfgtype__(cfgfile)
-        if isinstance(section, basestring):
+        if isinstance(section, str):
             section_list = (section,)
         else:
             section_list = section
@@ -207,14 +214,16 @@ class ConfigSectionType(type):
                 try:
                     setattr(cls, name, value)
                 except Exception as e:
-                    log.warning('ignoring invalid config value: %s.%s=%s (%s).' % (section, name, value, e))
+                    log.warning('ignoring invalid config value: %s.%s=%s (%s).' % (
+                        section, name, value, e))
 
     def set(cls, **kw):
         """Atomically set multiple settings at once"""
         if not set(kw).issubset(cls.__settings__):
-            raise TypeError('Got unexpected keyword argument %r' % set(kw).difference(cls.__settings__).pop())
+            raise TypeError('Got unexpected keyword argument %r' %
+                            set(kw).difference(cls.__settings__).pop())
         with AtomicUpdate(cls):
-            for name, value in kw.iteritems():
+            for name, value in kw.items():
                 setattr(cls, name, value)
 
     def reset(cls, state=None):
@@ -223,12 +232,13 @@ class ConfigSectionType(type):
         if not isinstance(state, SaveState):
             raise TypeError('state should be a SaveState instance')
         if state.__owner__ is not cls:
-            raise ValueError('save state does not belong to this config section')
-        for name, descriptor in cls.__settings__.iteritems():
+            raise ValueError(
+                'save state does not belong to this config section')
+        for name, descriptor in cls.__settings__.items():
             descriptor.__set__(cls, state[name], convert=False)
 
 
-class ConfigSection(object):
+class ConfigSection(object, metaclass=ConfigSectionType):
     """
     Defines a section in the configuration file
 
@@ -245,8 +255,6 @@ class ConfigSection(object):
                     for reading multiple sections (they will be read in
                     the order the iterable returns them)
     """
-
-    __metaclass__ = ConfigSectionType
 
     __cfgtype__ = ConfigFile
     __cfgfile__ = None

@@ -42,11 +42,13 @@ class DirectoryAttribute(object):
             elif self.type == 'local':
                 directory = root_directory  # the local directory doesn't use the subdirectory
             else:
-                directory = os.path.realpath(os.path.join(root_directory, instance.subdirectory or ''))
+                directory = os.path.realpath(os.path.join(
+                    root_directory, instance.subdirectory or ''))
             return instance._cache.setdefault(self.name, directory)
 
     def __set__(self, instance, value):
-        instance.__dict__[self.name] = os.path.realpath(value) if value is not None else None
+        instance.__dict__[self.name] = os.path.realpath(
+            value) if value is not None else None
 
     def __delete__(self, instance):
         try:
@@ -56,8 +58,10 @@ class DirectoryAttribute(object):
 
 
 class ConfigurationSettings(object):
-    _cache_affecting_attributes = {'system_root', 'user_root', 'local_root', 'subdirectory'}
-    _system_binary_directories = {'/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/local/bin', '/usr/local/sbin'}
+    _cache_affecting_attributes = {'system_root',
+                                   'user_root', 'local_root', 'subdirectory'}
+    _system_binary_directories = {
+        '/bin', '/sbin', '/usr/bin', '/usr/sbin', '/usr/local/bin', '/usr/local/sbin'}
 
     system_directory = DirectoryAttribute('system')  # type: str
     user_directory = DirectoryAttribute('user')      # type: str
@@ -65,7 +69,8 @@ class ConfigurationSettings(object):
 
     def __init__(self):
         # the script directory (the current directory when running in interactive mode)
-        script_directory = os.path.dirname(os.path.realpath(getattr(__main__, '__file__', sys.executable if hasattr(sys, 'frozen') else 'none')))
+        script_directory = os.path.dirname(os.path.realpath(getattr(
+            __main__, '__file__', sys.executable if hasattr(sys, 'frozen') else 'none')))
         self._cache = {}
         self.system_root = os.path.realpath('/etc')
         self.user_root = os.path.realpath(os.path.expanduser('~/.config'))
@@ -119,17 +124,17 @@ class RuntimeSettings(object):
                 os.makedirs(directory)
             except OSError as e:
                 if e.errno != errno.EEXIST:
-                    raise ProcessError('cannot create runtime directory at %s: %s' % (directory, e.strerror))
+                    raise ProcessError(
+                        'cannot create runtime directory at %s: %s' % (directory, e.strerror))
         if not os.path.isdir(directory):
             raise ProcessError('the path at %s is not a directory' % directory)
         if not os.access(directory, os.R_OK | os.W_OK | os.X_OK):
-            raise ProcessError('lacking permissions to access the runtime directory at %s' % directory)
+            raise ProcessError(
+                'lacking permissions to access the runtime directory at %s' % directory)
 
 
-class Process(object):
+class Process(object, metaclass=Singleton):
     """Control how the current process runs and interacts with the operating system"""
-
-    __metaclass__ = Singleton
 
     def __init__(self):
         self._daemon = False
@@ -155,7 +160,8 @@ class Process(object):
                 try:
                     pid = int(pf.readline().strip())
                 except IOError as e:
-                    raise ProcessError('unable to read pidfile %s: %s' % (pidfile, e))
+                    raise ProcessError(
+                        'unable to read pidfile %s: %s' % (pidfile, e))
                 except ValueError:
                     pass
                 else:
@@ -165,7 +171,8 @@ class Process(object):
                         os.kill(pid, 0)
                     except OSError as e:
                         if e.errno in (errno.EPERM, errno.EACCES):
-                            raise ProcessError('already running with pid %d' % pid)
+                            raise ProcessError(
+                                'already running with pid %d' % pid)
                     else:
                         raise ProcessError('already running with pid %d' % pid)
             finally:
@@ -185,15 +192,16 @@ class Process(object):
                 sys.exit(0)  # exit parent
                 # os._exit(0)
         except OSError as e:
-            raise ProcessError('fork #1 failed: %d: %s' % (e.errno, e.strerror))
-        
+            raise ProcessError('fork #1 failed: %d: %s' %
+                               (e.errno, e.strerror))
+
         # Decouple from the controlling terminal.
         # Calling setsid() we become a process group and session group leader.
         # Since a controlling terminal is associated with a session, and this
         # new session has not yet acquired a controlling terminal our process
         # now has no controlling terminal, which is a Good Thing for daemons.
         os.setsid()
-        
+
         # Second fork
         # This will allow the parent (the session group leader obtained above)
         # to exit. This means that the child, as a non-session group leader,
@@ -204,8 +212,9 @@ class Process(object):
                 sys.exit(0)  # exit 1st child too
                 # os._exit(0)
         except OSError as e:
-            raise ProcessError('fork #2 failed: %d: %s' % (e.errno, e.strerror))
-        
+            raise ProcessError('fork #2 failed: %d: %s' %
+                               (e.errno, e.strerror))
+
         # Setup our environment.
         # Change working directory to / so we do not keep any directory in use
         # preventing them from being unmounted. Also set file creation mask.
@@ -221,7 +230,8 @@ class Process(object):
             with open(self._pidfile, 'wb') as pf:
                 pf.write('%s\n' % os.getpid())
         except IOError as e:
-            raise ProcessError('unable to write pidfile %s: %s' % (self._pidfile, e))
+            raise ProcessError('unable to write pidfile %s: %s' %
+                               (self._pidfile, e))
 
     @staticmethod
     def _redirect_stdio():
@@ -254,7 +264,8 @@ class Process(object):
             try:
                 os.unlink(self._pidfile)
             except OSError as e:
-                log.warning('unable to delete pidfile %s: %s' % (self._pidfile, e))
+                log.warning('unable to delete pidfile %s: %s' %
+                            (self._pidfile, e))
 
     def daemonize(self, pidfile=None):
         """Detach from the terminal and run in the background"""
@@ -287,14 +298,13 @@ class Process(object):
                 log.info(wait_message)
             time.sleep(1)
         else:
-            raise RuntimeError('Network is not available after waiting for {} seconds'.format(wait_time))
+            raise RuntimeError(
+                'Network is not available after waiting for {} seconds'.format(wait_time))
 
 
-class Signals(object):
+class Signals(object, metaclass=Singleton):
     """Interface to the system signals"""
 
-    __metaclass__ = Singleton
-    
     def __init__(self):
         self._handlers = {}
         self._original_signal = signal.signal

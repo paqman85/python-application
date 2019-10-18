@@ -17,14 +17,12 @@ from application.python.weakref import weakobjectmap
 __all__ = 'Any', 'UnknownSender', 'IObserver', 'NotificationData', 'Notification', 'NotificationCenter', 'ObserverWeakrefProxy'
 
 
-class Any(object):
+class Any(object, metaclass=MarkerType):
     """Any sender or notification name"""
-    __metaclass__ = MarkerType
 
 
-class UnknownSender(object):
+class UnknownSender(object, metaclass=MarkerType):
     """A special sender used for anonymous notifications"""
-    __metaclass__ = MarkerType
 
 
 class IObserver(Interface):
@@ -61,7 +59,7 @@ class ObserverWeakrefProxy(object):
     # noinspection PyUnusedLocal
     def cleanup(self, ref):
         # remove all observer's remaining registrations (the ones that the observer didn't remove itself)
-        for notification_center in NotificationCenter.__instances__.itervalues():
+        for notification_center in NotificationCenter.__instances__.values():
             notification_center.purge_observer(self)
 
     def handle_notification(self, notification):
@@ -77,7 +75,7 @@ class NotificationData(object):
         self.__dict__.update(kwargs)
 
     def __repr__(self):
-        return '%s(%s)' % (self.__class__.__name__, ', '.join('%s=%r' % (name, value) for name, value in self.__dict__.iteritems()))
+        return '%s(%s)' % (self.__class__.__name__, ', '.join('%s=%r' % (name, value) for name, value in self.__dict__.items()))
 
 
 class Notification(object):
@@ -85,7 +83,8 @@ class Notification(object):
 
     def __init__(self, name, sender=UnknownSender, data=NotificationData()):
         if name is Any or sender is Any:
-            raise ValueError('name and/or sender must not be the special object Any')
+            raise ValueError(
+                'name and/or sender must not be the special object Any')
         self.name = name
         self.sender = sender
         self.data = data
@@ -103,14 +102,12 @@ class Notification(object):
         return '%s(%r, %r, %r)' % (self.__class__.__name__, self.name, self.sender, self.data)
 
 
-class NotificationCenter(object):
+class NotificationCenter(object, metaclass=Singleton):
     """
     A NotificationCenter allows observers to subscribe to receive notifications
     identified by name and sender and will distribute the posted notifications
     according to those subscriptions.
     """
-
-    __metaclass__ = Singleton
 
     queue = ThreadLocal(deque)
 
@@ -154,7 +151,8 @@ class NotificationCenter(object):
                 observer_set = self.observers[(name, sender)]
                 observer_set.remove(observer)
             except KeyError:
-                raise KeyError('observer %r not registered for %r events from %r' % (observer, name, sender))
+                raise KeyError('observer %r not registered for %r events from %r' % (
+                    observer, name, sender))
             if not observer_set:
                 del self.observers[(name, sender)]
 
@@ -178,7 +176,8 @@ class NotificationCenter(object):
     def purge_observer(self, observer):
         """Remove all the observer's subscriptions."""
         with self.lock:
-            subscriptions = [(key, observer_set) for key, observer_set in self.observers.iteritems() if observer in observer_set]
+            subscriptions = [(key, observer_set) for key, observer_set in self.observers.items(
+            ) if observer in observer_set]
             for key, observer_set in subscriptions:
                 observer_set.remove(observer)
                 if not observer_set:
@@ -210,5 +209,6 @@ class NotificationCenter(object):
                 try:
                     observer.handle_notification(notification)
                 except Exception:
-                    log.exception('Unhandled exception in notification observer %r while handling notification %r' % (observer, notification.name))
+                    log.exception('Unhandled exception in notification observer %r while handling notification %r' % (
+                        observer, notification.name))
             queue.popleft()

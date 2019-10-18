@@ -13,10 +13,8 @@ __all__ = 'host', 'makedirs', 'openfile', 'unlink', 'FileExistsError'
 
 # System properties and attributes
 
-class HostProperties(object):
+class HostProperties(object, metaclass=Singleton):
     """Host specific properties"""
-
-    __metaclass__ = Singleton
 
     @staticmethod
     def outgoing_ip_for(destination):
@@ -67,7 +65,7 @@ def makedirs(path, mode=0o777):
     """Create a directory recursively and ignore error if it already exists"""
     try:
         os.makedirs(path, mode)
-    except OSError, e:
+    except OSError as e:
         if e.errno == errno.EEXIST and os.path.isdir(path) and os.access(path, os.R_OK | os.W_OK | os.X_OK):
             return
         raise
@@ -83,9 +81,11 @@ def openfile(path, mode='r', permissions=0o666):
     if not set(mode).issubset('rwxabt+'):
         raise ValueError('Invalid mode: {!r}'.format(mode))
     if len(set(mode).intersection('rwxa')) != 1 or mode.count('+') > 1:
-        raise ValueError('Must have exactly one of create/read/write/append mode and at most one plus')
+        raise ValueError(
+            'Must have exactly one of create/read/write/append mode and at most one plus')
     if 'b' in mode and 't' in mode:
-        raise ValueError('Cannot have both text and binary modes specified at the same time')
+        raise ValueError(
+            'Cannot have both text and binary modes specified at the same time')
 
     write = append = False
 

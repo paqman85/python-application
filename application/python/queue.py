@@ -1,7 +1,7 @@
 
 """Event processing queues, that process the events in a distinct thread"""
 
-import Queue
+from . import Queue
 from threading import Thread, Event, Lock
 
 from application import log
@@ -13,9 +13,16 @@ __all__ = 'EventQueue', 'CumulativeEventQueue'
 
 # Special events that control the queue operation (for internal use)
 
-class StopProcessing: __metaclass__ = MarkerType
-class ProcessEvents:  __metaclass__ = MarkerType
-class DiscardEvents:  __metaclass__ = MarkerType
+class StopProcessing(metaclass=MarkerType):
+    pass
+
+
+class ProcessEvents(metaclass=MarkerType):
+    pass
+
+
+class DiscardEvents(metaclass=MarkerType):
+    pass
 
 
 class EventQueue(Thread):
@@ -150,11 +157,13 @@ class CumulativeEventQueue(EventQueue):
                     try:
                         unhandled = self.handle(self._waiting)
                         if not isinstance(unhandled, (list, type(None))):
-                            raise ValueError('%s handler must return a list of unhandled events or None' % self.__class__.__name__)
+                            raise ValueError(
+                                '%s handler must return a list of unhandled events or None' % self.__class__.__name__)
                         if unhandled is not None:
                             preserved = unhandled  # preserve the unhandled events that the handler returned
                     except Exception:
-                        log.exception('Unhandled exception during event handling')
+                        log.exception(
+                            'Unhandled exception during event handling')
                     self._waiting = preserved
             elif event is DiscardEvents:
                 self._waiting = []
@@ -164,7 +173,8 @@ class CumulativeEventQueue(EventQueue):
                     try:
                         self.handle([event])
                     except Exception:
-                        log.exception('Unhandled exception during high priority event handling')
+                        log.exception(
+                            'Unhandled exception during high priority event handling')
                     finally:
                         del event  # do not reference this event until the next event arrives, in order to allow it to be released
                 else:

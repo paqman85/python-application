@@ -27,7 +27,7 @@ import struct
 import sys
 
 from collections import deque
-from itertools import chain, izip, takewhile
+from itertools import chain, takewhile
 from time import clock, time
 
 from application.python.decorator import decorator, preserve_signature
@@ -37,8 +37,8 @@ from application.python.types import MarkerType
 __all__ = 'Timer', 'TimeProbe', 'timer', 'time_probe', 'measure_time'
 
 
-class Automatic(object):
-    __metaclass__ = MarkerType
+class Automatic(object, metaclass=MarkerType):
+    pass
 
 
 class Autodetect(int):
@@ -47,6 +47,7 @@ class Autodetect(int):
 
     def __repr__(self):
         return self.__class__.__name__
+
 
 Autodetect = Autodetect()
 
@@ -69,7 +70,8 @@ class Timer(object):
         parent = inspect.currentframe().f_back
         try:
             if parent.f_code.co_flags & inspect.CO_NEWLOCALS:
-                raise RuntimeError('timers only work when invoked at the module/script level')
+                raise RuntimeError(
+                    'timers only work when invoked at the module/script level')
             self._with_start = parent.f_lasti
         finally:
             del parent
@@ -90,20 +92,25 @@ class Timer(object):
 
                 try:
                     # calculate the iteration overhead
-                    empty_loop = self._build_loop_code(parent.f_code, with_start=self._with_start, with_end=self._with_start, loop_count=100000)
+                    empty_loop = self._build_loop_code(
+                        parent.f_code, with_start=self._with_start, with_end=self._with_start, loop_count=100000)
                     start_time = self.time_function()
                     exec(empty_loop, parent.f_globals, parent.f_locals)
                     end_time = self.time_function()
-                    iteration_overhead = (end_time - start_time) / empty_loop.co_consts[-1]  # _build_loop_code() puts the loop_count as the last entry in co_consts
+                    # _build_loop_code() puts the loop_count as the last entry in co_consts
+                    iteration_overhead = (
+                        end_time - start_time) / empty_loop.co_consts[-1]
 
-                    new_code = self._build_loop_code(parent.f_code, with_start=self._with_start, with_end=parent.f_lasti, loop_count=loops)
+                    new_code = self._build_loop_code(
+                        parent.f_code, with_start=self._with_start, with_end=parent.f_lasti, loop_count=loops)
 
                     results = []
                     for r in range(self.repeat):
                         start_time = self.time_function()
                         exec(new_code, parent.f_globals, parent.f_locals)
                         duration = self.time_function() - start_time
-                        if not self.loops and not results and duration < 0.2 and loops < 10**9:  # the first estimate may have been inaccurate when the duration is very small
+                        # the first estimate may have been inaccurate when the duration is very small
+                        if not self.loops and not results and duration < 0.2 and loops < 10**9:
                             # loops = self._estimate_loop_count(duration, loops)
                             while duration < 0.2 and loops < 10**9:
                                 duration *= 10
@@ -114,18 +121,21 @@ class Timer(object):
                             duration = self.time_function() - start_time
                         results.append(duration)
 
-                    execution_time = min(results)  # best time out of repeat tries
-                    statement_time = max(execution_time / loops - iteration_overhead, iteration_overhead / 100)
+                    # best time out of repeat tries
+                    execution_time = min(results)
+                    statement_time = max(
+                        execution_time / loops - iteration_overhead, iteration_overhead / 100)
                     statement_rate = 1 / statement_time
 
                     normalized_time, time_unit = normalize_time(statement_time)
 
                     if self.description is not None:
-                        format_string = u'{} loops, best of {}: {:.{precision}g} {} per loop ({:.{rate_precision}f} operations/sec); {description}'
+                        format_string = '{} loops, best of {}: {:.{precision}g} {} per loop ({:.{rate_precision}f} operations/sec); {description}'
                     else:
-                        format_string = u'{} loops, best of {}: {:.{precision}g} {} per loop ({:.{rate_precision}f} operations/sec)'
+                        format_string = '{} loops, best of {}: {:.{precision}g} {} per loop ({:.{rate_precision}f} operations/sec)'
                     rate_precision = 2 if statement_rate < 10 else 1 if statement_rate < 100 else 0
-                    print format_string.format(loops, self.repeat, normalized_time, time_unit, statement_rate, description=self.description, precision=3, rate_precision=rate_precision)
+                    print(format_string.format(loops, self.repeat, normalized_time, time_unit, statement_rate,
+                                               description=self.description, precision=3, rate_precision=rate_precision))
                 finally:
                     del parent
         finally:
@@ -157,13 +167,15 @@ class Timer(object):
         #           zz+6 LOAD_CONST               p (None)
         #           zz+9 RETURN_VALUE
 
-        code_start = with_start + 3  # move past the SETUP_WITH opcode (1 byte opcode itself + 2 bytes delta)
+        # move past the SETUP_WITH opcode (1 byte opcode itself + 2 bytes delta)
+        code_start = with_start + 3
         # skip the next bytecode which can be one of POP_TOP, STORE_FAST, STORE_NAME, UNPACK_SEQUENCE (POP_TOP is 1 byte, the others are 3)
         if ord(o_code.co_code[code_start]) == dis.opmap['POP_TOP']:
             code_start += 1
         else:
             code_start += 3
-        code_end = with_end - 4  # at the end there is a POP_BLOCK + LOAD_CONST (index) (1 + 3 = 4 bytes)
+        # at the end there is a POP_BLOCK + LOAD_CONST (index) (1 + 3 = 4 bytes)
+        code_end = with_end - 4
 
         code_bytes = bytearray(o_code.co_code[code_start:code_end])
 
@@ -200,15 +212,21 @@ class Timer(object):
         # xx +  3 == zz + 4  ->  xx = len(loop_header) + len(code_bytes) + 4 -  3 = len(loop_header) + len(code_bytes) +  1
         # yy + 16 == zz + 3  ->  yy = len(loop_header) + len(code_bytes) + 3 - 16 = len(loop_header) + len(code_bytes) - 13  (13 is the FOR_ITER bytecode offset)
 
-        loop_header = bytearray('\x78\x00\x00\x65\x00\x00\x64\x00\x00\x83\x01\x00\x44\x5d\x00\x00\x01')
+        loop_header = bytearray(
+            '\x78\x00\x00\x65\x00\x00\x64\x00\x00\x83\x01\x00\x44\x5d\x00\x00\x01')
         loop_footer = bytearray('\x71\x0d\x00\x57\x64\x00\x00\x53')
 
-        struct.pack_into('<H', loop_header,  1, len(loop_header) + len(code_bytes) + 1)    # SETUP_LOOP delta (xx)
-        struct.pack_into('<H', loop_header,  4, len(names) - 1)                            # LOAD_NAME index for range function
-        struct.pack_into('<H', loop_header,  7, len(code_constants) - 1)                   # LOAD_CONST index for loop count
-        struct.pack_into('<H', loop_header, 14, len(loop_header) + len(code_bytes) - 13)   # FOR_ITER delta (yy)
+        struct.pack_into('<H', loop_header,  1, len(
+            loop_header) + len(code_bytes) + 1)    # SETUP_LOOP delta (xx)
+        # LOAD_NAME index for range function
+        struct.pack_into('<H', loop_header,  4, len(names) - 1)
+        # LOAD_CONST index for loop count
+        struct.pack_into('<H', loop_header,  7, len(code_constants) - 1)
+        struct.pack_into('<H', loop_header, 14, len(
+            loop_header) + len(code_bytes) - 13)   # FOR_ITER delta (yy)
 
-        struct.pack_into('<H', loop_footer,  5, code_constants.index(None))                # LOAD_CONST index for None
+        struct.pack_into('<H', loop_footer,  5, code_constants.index(
+            None))                # LOAD_CONST index for None
 
         # adjust the jump addresses within the original code block to match the new bytecode offset they will have within the for loop
         index = 0
@@ -219,8 +237,10 @@ class Timer(object):
             index += 1
             if opcode >= dis.HAVE_ARGUMENT:
                 if opcode in dis.hasjabs:
-                    jump_address = struct.unpack_from('<H', code_bytes, index)[0]
-                    struct.pack_into('<H', code_bytes, index, jump_address + offset)
+                    jump_address = struct.unpack_from(
+                        '<H', code_bytes, index)[0]
+                    struct.pack_into('<H', code_bytes, index,
+                                     jump_address + offset)
                 index += 2
 
         new_code_bytes = bytes(loop_header + code_bytes + loop_footer)
@@ -245,7 +265,8 @@ class Timer(object):
         byte_increments.appendleft(len(loop_header))
         line_increments.appendleft(1)
 
-        line_numbers_table = bytes(bytearray(chain.from_iterable(takewhile(WithinCodeRange(len(loop_header + code_bytes)), izip(byte_increments, line_increments)))))
+        line_numbers_table = bytes(bytearray(chain.from_iterable(takewhile(WithinCodeRange(
+            len(loop_header + code_bytes)), zip(byte_increments, line_increments)))))
 
         return code(o_code.co_argcount, o_code.co_nlocals, o_code.co_stacksize, o_code.co_flags, new_code_bytes, code_constants, names, o_code.co_varnames,
                     o_code.co_filename, o_code.co_name, o_code.co_firstlineno + line_offset - 1, line_numbers_table, o_code.co_freevars, o_code.co_cellvars)
@@ -271,6 +292,7 @@ class Timer(object):
         else:
             loops = 10**9
         return loops
+
 
 timer = Timer
 
@@ -307,16 +329,19 @@ class TimeProbe(object):
             if error >= 0.1:
                 precision = 2 if error < 10 else 1 if error < 100 else 0
                 # error_string = ' (measurement error: {:.{precision}f}%)'.format(error, precision=precision)
-                error_string = ' (uncertainty {:.{precision}f}%)'.format(error, precision=precision)
+                error_string = ' (uncertainty {:.{precision}f}%)'.format(
+                    error, precision=precision)
             else:
                 error_string = ''
             if self.description is not None:
                 # format_string = u'{:.{precision}g} {}{}; {description}'
-                format_string = u'{description}: {:.{precision}g} {}{}'
+                format_string = '{description}: {:.{precision}g} {}{}'
             else:
-                format_string = u'{:.{precision}g} {}{}'
-            print format_string.format(normalized_time, time_unit, error_string, description=self.description, precision=3)
+                format_string = '{:.{precision}g} {}{}'
+            print(format_string.format(normalized_time, time_unit,
+                                       error_string, description=self.description, precision=3))
         del self._start_time
+
 
 time_probe = TimeProbe
 
@@ -357,7 +382,7 @@ class _MeasurementProbe(object):
         gc_enabled = gc.isenabled()
         gc.disable()
         try:
-            return _MeasurementSamples(self.get_sample() for _ in xrange(iterations))
+            return _MeasurementSamples(self.get_sample() for _ in range(iterations))
         finally:
             if gc_enabled:
                 gc.enable()
@@ -368,8 +393,10 @@ class _MeasurementSamples(tuple):
         super(_MeasurementSamples, self).__init__(samples)
         self.average_value = sum(self) / len(self)
         self.value_set = set(self)
-        self.value_distribution = {value: self.count(value) for value in self.value_set}
-        self.sampling_unit = min(x for x in self.value_set if x != 0) if self.value_set != {0} else 1  # assume the worst (1 second timer accuracy)
+        self.value_distribution = {value: self.count(
+            value) for value in self.value_set}
+        self.sampling_unit = min(x for x in self.value_set if x != 0) if self.value_set != {
+            0} else 1  # assume the worst (1 second timer accuracy)
 
 
 def normalize_time(run_time):

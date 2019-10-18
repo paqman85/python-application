@@ -23,21 +23,26 @@ class Version(str):
         if extraversion is None:
             instance = str.__new__(cls, '%d.%d.%d' % (major, minor, micro))
             weight = 0
-        elif isinstance(extraversion, (int, long)):
-            instance = str.__new__(cls, '%d.%d.%d-%d' % (major, minor, micro, extraversion))
+        elif isinstance(extraversion, int):
+            instance = str.__new__(cls, '%d.%d.%d-%d' %
+                                   (major, minor, micro, extraversion))
             weight = 0
-        elif isinstance(extraversion, basestring):
-            instance = str.__new__(cls, '%d.%d.%d%s' % (major, minor, micro, extraversion))
-            match = re.match(r'^[-.]?(?P<name>(pre|rc|alpha|beta|))(?P<number>\d+)$', extraversion)
+        elif isinstance(extraversion, str):
+            instance = str.__new__(cls, '%d.%d.%d%s' %
+                                   (major, minor, micro, extraversion))
+            match = re.match(
+                r'^[-.]?(?P<name>(pre|rc|alpha|beta|))(?P<number>\d+)$', extraversion)
             if match:
-                weight_map = {'alpha': -40, 'beta': -30, 'pre': -20, 'rc': -10, '': 0}
+                weight_map = {'alpha': -40, 'beta': -
+                              30, 'pre': -20, 'rc': -10, '': 0}
                 weight = weight_map[match.group('name')]
                 extraversion = int(match.group('number'))
             else:
                 weight = 0
                 extraversion = extraversion or None
         else:
-            raise TypeError('extraversion must be a string, integer, long or None')
+            raise TypeError(
+                'extraversion must be a string, integer, long or None')
         instance._version_info = (major, minor, micro, weight, extraversion)
         return instance
 
@@ -48,11 +53,12 @@ class Version(str):
     def parse(cls, value):
         if isinstance(value, Version):
             return value
-        elif not isinstance(value, basestring):
+        elif not isinstance(value, str):
             raise TypeError('value should be a string')
         if value == 'undefined':
             return cls(None, None, None)
-        match = re.match(r'^(?P<major>\d+)(\.(?P<minor>\d+))?(\.(?P<micro>\d+))?(?P<extraversion>.*)$', value)
+        match = re.match(
+            r'^(?P<major>\d+)(\.(?P<minor>\d+))?(\.(?P<micro>\d+))?(?P<extraversion>.*)$', value)
         if not match:
             raise ValueError('not a recognized version string')
         return cls(**match.groupdict(0))
@@ -83,7 +89,7 @@ class Version(str):
     def __cmp__(self, other):
         if isinstance(other, Version):
             return cmp(self._version_info, other._version_info)
-        elif isinstance(other, basestring):
+        elif isinstance(other, str):
             return cmp(str(self), other)
         else:
             return NotImplemented
@@ -105,4 +111,3 @@ class Version(str):
 
     def __ne__(self, other):
         return self.__cmp__(other) != 0
-

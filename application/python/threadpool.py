@@ -1,7 +1,7 @@
 
 """A generic, resizable thread pool"""
 
-from Queue import Queue
+from .Queue import Queue
 from itertools import count
 from threading import Lock, Thread, current_thread
 
@@ -61,7 +61,8 @@ class ThreadPool(object):
                 return
             self._started = True
             self._thread_id = count(1)
-            needed_workers = limit(self.jobs, min=self.min_threads, max=self.max_threads)
+            needed_workers = limit(
+                self.jobs, min=self.min_threads, max=self.max_threads)
             while self.workers < needed_workers:
                 self._start_worker()
 
@@ -83,7 +84,8 @@ class ThreadPool(object):
             self.__dict__['min_threads'] = min_threads
             self.__dict__['max_threads'] = max_threads
             if self._started:
-                needed_workers = limit(self.jobs, min=min_threads, max=max_threads)
+                needed_workers = limit(
+                    self.jobs, min=min_threads, max=max_threads)
                 while self.workers > max_threads:  # compare against needed_workers to compact or against max_threads to not
                     self._stop_worker()
                 while self.workers < needed_workers:
@@ -91,7 +93,8 @@ class ThreadPool(object):
 
     def compact(self):
         with self._lock:
-            needed_workers = limit(self.jobs, min=self.min_threads, max=self.max_threads)
+            needed_workers = limit(
+                self.jobs, min=self.min_threads, max=self.max_threads)
             while self.workers > needed_workers:
                 self._stop_worker()
 
@@ -105,7 +108,8 @@ class ThreadPool(object):
     def _start_worker(self):
         # Must be called with the lock held
         self.__dict__['workers'] += 1
-        name = '%sThread-%s-%s' % (self.__class__.__name__, self.name or id(self), next(self._thread_id))
+        name = '%sThread-%s-%s' % (self.__class__.__name__,
+                                   self.name or id(self), next(self._thread_id))
         thread = Thread(target=self._worker, name=name)
         self._threads.append(thread)
         thread.daemon = True
@@ -126,7 +130,8 @@ class ThreadPool(object):
             try:
                 task.function(*task.args, **task.kw)
             except Exception:
-                log.exception('Unhandled exception while calling %r in the %r thread' % (task.function, thread.name))
+                log.exception('Unhandled exception while calling %r in the %r thread' % (
+                    task.function, thread.name))
             finally:
                 with self._lock:
                     self.__dict__['jobs'] -= 1

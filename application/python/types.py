@@ -1,7 +1,6 @@
 
 """Types and meta classes"""
 
-from __future__ import absolute_import
 
 from types import FunctionType, UnboundMethodType
 from application.python.decorator import preserve_signature
@@ -26,18 +25,21 @@ class Singleton(type):
         # noinspection PyShadowingNames
         @preserve_signature(initializer)
         def instance_creator(cls, *args, **kw):
-            key = (args, tuple(sorted(kw.iteritems())))
+            key = (args, tuple(sorted(kw.items())))
             try:
                 hash(key)
             except TypeError:
-                raise TypeError('cannot have singletons for classes with unhashable arguments')
+                raise TypeError(
+                    'cannot have singletons for classes with unhashable arguments')
             if key not in cls.__instances__:
-                cls.__instances__[key] = super(Singleton, cls).__call__(*args, **kw)
+                cls.__instances__[key] = super(
+                    Singleton, cls).__call__(*args, **kw)
             return cls.__instances__[key]
 
         super(Singleton, cls).__init__(name, bases, dictionary)
         cls.__instances__ = {}
-        cls.__instantiate__ = instance_creator.__get__(cls, type(cls))  # bind instance_creator to cls
+        cls.__instantiate__ = instance_creator.__get__(
+            cls, type(cls))  # bind instance_creator to cls
 
     def __call__(cls, *args, **kw):
         return cls.__instantiate__(*args, **kw)
@@ -53,10 +55,8 @@ class NullTypeMeta(type):
         return cls.__instance__
 
 
-class NullType(object):
+class NullType(object, metaclass=NullTypeMeta):
     """Instances of this class always and reliably "do nothing"."""
-
-    __metaclass__ = NullTypeMeta
     __name__ = 'Null'
 
     def __init__(self, *args, **kw):
@@ -77,7 +77,7 @@ class NullType(object):
     def __len__(self):
         return 0
 
-    def __nonzero__(self):
+    def __bool__(self):
         return False
 
     def __eq__(self, other):
@@ -125,7 +125,7 @@ class NullType(object):
     def __iter__(self):
         return self
 
-    def next(self):
+    def __next__(self):
         raise StopIteration
 
 
@@ -140,5 +140,5 @@ class MarkerType(type):
     def __repr__(cls):
         return cls.__name__
 
-    def __nonzero__(cls):
+    def __bool__(cls):
         return cls.__boolean__

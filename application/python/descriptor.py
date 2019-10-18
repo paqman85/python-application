@@ -33,11 +33,13 @@ class ThreadLocal(object):
         try:
             return self.thread_local.__dict__[id(instance)]
         except KeyError:
-            self.thread_local.__dict__[weakobjectid(instance, discarder(self.thread_local.__dict__))] = instance = self.type(*self.args, **self.kw)
+            self.thread_local.__dict__[weakobjectid(instance, discarder(
+                self.thread_local.__dict__))] = instance = self.type(*self.args, **self.kw)
             return instance
 
     def __set__(self, instance, value):
-        self.thread_local.__dict__[weakobjectid(instance, discarder(self.thread_local.__dict__))] = value
+        self.thread_local.__dict__[weakobjectid(
+            instance, discarder(self.thread_local.__dict__))] = value
 
     def __delete__(self, instance):
         raise AttributeError('attribute cannot be deleted')
